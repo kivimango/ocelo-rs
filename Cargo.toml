@@ -1,2 +1,4 @@
 [workspace]
-members = [ "bin","core", "tui"]
+members = ["bin", "core", "tui"]
+
+resolver = "2"
