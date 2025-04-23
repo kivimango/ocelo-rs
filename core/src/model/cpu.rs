@@ -1,0 +1,16 @@
+///  Detailed information collected about the main processor.
+#[derive(Debug, Clone)]
+pub struct CpuInfo {
+    /// Full name of the processor, like Intel Core i5-6500
+    pub name: String,
+
+    /// Current frequency in MHz
+    pub frequency: u64,
+
+    /// The physical core count
+    pub core_count: usize,
+
+    /// The reported temperature of the processor.
+    /// On some platforms, this information is not available
+    pub temperature: Option<f32>,
+}
