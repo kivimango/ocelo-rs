@@ -1,3 +1,4 @@
-mod component;
+pub mod component;
+mod view;
 
-pub use component::*;
+pub use self::view::*;
