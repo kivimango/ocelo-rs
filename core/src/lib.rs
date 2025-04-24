@@ -1,6 +1,6 @@
-mod model;
+pub mod model;
 
-use model::CpuInfo;
+pub use self::model::CpuInfo;
 use sysinfo::System;
 
 pub fn get_cpu_info() -> CpuInfo {
