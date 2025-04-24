@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tuirealm = "2.1.0"
+tuirealm = { version = "2.1.0", default-features = false, features = [
+    "termion",
+] }
 ratatui = "0.29.0"
 termion = "4.0.5"
 

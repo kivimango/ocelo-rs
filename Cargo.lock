@@ -412,6 +412,7 @@ dependencies = [
  "lru",
  "paste",
  "strum",
+ "termion",
  "unicode-segmentation",
  "unicode-truncate",
  "unicode-width 0.2.0",
@@ -635,22 +636,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "435d695a72ceae83f149a0241aad72ae8d3e680ab4d2ed86adb50df611ac026c"
 dependencies = [
  "bitflags",
- "crossterm",
  "lazy-regex",
  "ratatui",
+ "termion",
  "thiserror",
- "tuirealm_derive",
-]
-
-[[package]]
-name = "tuirealm_derive"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "caa8b0560f4245acc0bbe0e1d76e1f6a308145dd6e107befce4cf29e7fe32662"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
