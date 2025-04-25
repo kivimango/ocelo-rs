@@ -1,6 +1,6 @@
 pub mod model;
 
-pub use self::model::CpuInfo;
+pub use self::model::{CpuInfo, SystemInfo};
 use sysinfo::System;
 
 pub fn get_cpu_info() -> CpuInfo {
@@ -27,5 +27,21 @@ pub fn get_cpu_info() -> CpuInfo {
         frequency: average_frequency,
         core_count,
         temperature: None,
+    }
+}
+
+pub fn get_system_info() -> SystemInfo {
+    let host_name = System::host_name().unwrap_or_else(|| "N/A".to_string());
+    let uptime = System::uptime();
+    let kernel_version = System::kernel_long_version();
+    let load_avg = System::load_average();
+
+    SystemInfo {
+        host_name,
+        kernel_version,
+        uptime,
+        load_one_minute: load_avg.one,
+        load_five_minutes: load_avg.five,
+        load_fifteen_minutes: load_avg.fifteen,
     }
 }
