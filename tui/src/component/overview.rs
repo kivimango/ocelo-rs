@@ -58,7 +58,16 @@ impl MockComponent for OverView {
     }
 
     fn view(&mut self, frame: &mut Frame, area: Rect) {
-        self.render_cpu_info(frame, area);
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(&[
+                Constraint::Percentage(25),
+                Constraint::Percentage(25),
+                Constraint::Percentage(25),
+                Constraint::Percentage(25),
+            ])
+            .chunks(area);
+        self.render_cpu_info(frame, chunks[1]);
     }
 }
 

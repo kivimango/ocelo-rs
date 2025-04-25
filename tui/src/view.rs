@@ -1,7 +1,5 @@
 use crate::component::OverView;
 use std::time::Duration;
-use tuirealm::props::Layout;
-use tuirealm::ratatui::layout::{Constraint, Direction};
 use tuirealm::terminal::{TerminalBridge, TermionTerminalAdapter};
 use tuirealm::{Application, EventListenerCfg, NoUserEvent, PollStrategy, Update};
 
@@ -66,17 +64,8 @@ impl View {
         assert!(self
             .terminal
             .draw(|frame| {
-                let chunks = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints(&[
-                        Constraint::Percentage(25),
-                        Constraint::Percentage(25),
-                        Constraint::Percentage(25),
-                        Constraint::Percentage(25),
-                    ])
-                    .chunks(frame.area());
-
-                self.tuirealm.view(&Components::Overvieww, frame, chunks[0]);
+                self.tuirealm
+                    .view(&Components::Overvieww, frame, frame.area());
             })
             .is_ok())
     }
