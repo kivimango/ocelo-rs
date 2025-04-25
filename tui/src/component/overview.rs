@@ -1,4 +1,4 @@
-use core::model::CpuInfo;
+use core::{model::CpuInfo, SystemInfo};
 use tuirealm::{
     command::{Cmd, CmdResult},
     event::{Key, KeyEvent},
@@ -16,6 +16,7 @@ use crate::view::Message;
 pub struct OverView {
     cpu_info: CpuInfo,
     properties: Props,
+    system_info: SystemInfo,
 }
 
 impl Default for OverView {
@@ -28,6 +29,7 @@ impl Default for OverView {
                 temperature: None,
             },
             properties: Props::default(),
+            system_info: SystemInfo::default(),
         }
     }
 }
@@ -36,6 +38,12 @@ impl OverView {
     /// Sets the processor information during initalization of the component.
     pub fn with_cpu_info(mut self, cpu_info: CpuInfo) -> Self {
         self.cpu_info = cpu_info;
+        self
+    }
+
+    /// Sets the system information during initalization of the component.
+    pub fn with_system_info(mut self, system_info: SystemInfo) -> Self {
+        self.system_info = system_info;
         self
     }
 }
@@ -67,6 +75,7 @@ impl MockComponent for OverView {
                 Constraint::Percentage(25),
             ])
             .chunks(area);
+        self.render_system_info(frame, chunks[0]);
         self.render_cpu_info(frame, chunks[1]);
     }
 }
@@ -110,4 +119,56 @@ impl OverView {
 
         frame.render_widget(paragraph, cpu_area[0]);
     }
+
+    fn render_system_info(&self, frame: &mut Frame, area: Rect) {
+        let sysinfo_area = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(&[Constraint::Fill(1)])
+            .chunks(area);
+
+        let block = tuirealm::ratatui::widgets::Block::default()
+            .border_type(tuirealm::props::BorderType::Rounded)
+            .borders(Borders::ALL)
+            .title("System")
+            .title_alignment(ratatui::layout::Alignment::Left);
+
+        let uptime = format_uptime(self.system_info.uptime);
+
+        let text = format!(
+            "Hostname: {}\nSystem: {}\nUptime: {}\nLoad average: 1m:{}% 5m:{}% 15m:{}%\n",
+            self.system_info.host_name,
+            self.system_info.kernel_version,
+            uptime,
+            self.system_info.load_one_minute,
+            self.system_info.load_five_minutes,
+            self.system_info.load_fifteen_minutes
+        );
+
+        let paragraph = Paragraph::new(text).block(block);
+        frame.render_widget(paragraph, sysinfo_area[0]);
+    }
+}
+
+fn format_uptime(seconds: u64) -> String {
+    let days = seconds / 86400;
+    let hours = (seconds % 86400) / 3600;
+    let minutes = (seconds % 3600) / 60;
+    let secs = seconds % 60;
+
+    let mut parts = vec![];
+
+    if days > 0 {
+        parts.push(format!("{} days", days));
+    }
+    if hours > 0 {
+        parts.push(format!("{} hours", hours));
+    }
+    if minutes > 0 {
+        parts.push(format!("{} minutes", minutes));
+    }
+    if secs > 0 || parts.is_empty() {
+        parts.push(format!("{} seconds", secs));
+    }
+
+    parts.join(", ")
 }
