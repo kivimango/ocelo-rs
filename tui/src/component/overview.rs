@@ -37,6 +37,15 @@ impl OverView {
 
 impl MockComponent for OverView {
     fn attr(&mut self, attr: Attribute, value: AttrValue) {
+        if matches!(attr, Attribute::Custom(_)) {
+            let str = value.as_string().unwrap();
+            match SystemOverviewInfo::from_json(str) {
+                Ok(update) => {
+                    self.sysinfo = update;
+                }
+                Err(error) => eprintln!("Cannot convert SystemOverviewInfo from JSON: {}", error),
+            }
+        }
         self.properties.set(attr, value);
     }
 
