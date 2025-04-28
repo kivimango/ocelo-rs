@@ -1,4 +1,4 @@
-use core::{model::CpuInfo, SystemInfo};
+use core::model::SystemOverviewInfo;
 use tuirealm::{
     command::{Cmd, CmdResult},
     event::{Key, KeyEvent},
@@ -14,36 +14,23 @@ use tuirealm::{
 use crate::view::Message;
 
 pub struct OverView {
-    cpu_info: CpuInfo,
     properties: Props,
-    system_info: SystemInfo,
+    sysinfo: SystemOverviewInfo,
 }
 
 impl Default for OverView {
     fn default() -> Self {
         Self {
-            cpu_info: CpuInfo {
-                name: String::new(),
-                frequency: 0,
-                core_count: 0,
-                temperature: None,
-            },
             properties: Props::default(),
-            system_info: SystemInfo::default(),
+            sysinfo: SystemOverviewInfo::default(),
         }
     }
 }
 
 impl OverView {
-    /// Sets the processor information during initalization of the component.
-    pub fn with_cpu_info(mut self, cpu_info: CpuInfo) -> Self {
-        self.cpu_info = cpu_info;
-        self
-    }
-
     /// Sets the system information during initalization of the component.
-    pub fn with_system_info(mut self, system_info: SystemInfo) -> Self {
-        self.system_info = system_info;
+    pub fn with_system_info(mut self, system_info: SystemOverviewInfo) -> Self {
+        self.sysinfo = system_info;
         self
     }
 }
@@ -107,10 +94,11 @@ impl OverView {
 
         let text = format!(
             "CPU: {}\nCores: {}\nAvg freq: {} MHz\nTemp: {}",
-            self.cpu_info.name,
-            self.cpu_info.core_count,
-            self.cpu_info.frequency,
-            self.cpu_info
+            self.sysinfo.cpu.name,
+            self.sysinfo.cpu.core_count,
+            self.sysinfo.cpu.frequency,
+            self.sysinfo
+                .cpu
                 .temperature
                 .map_or("N/A".into(), |t| format!("{:.1}°C", t))
         );
@@ -132,16 +120,16 @@ impl OverView {
             .title("System")
             .title_alignment(ratatui::layout::Alignment::Left);
 
-        let uptime = format_uptime(self.system_info.uptime);
+        let uptime = format_uptime(self.sysinfo.overview.uptime);
 
         let text = format!(
             "Hostname: {}\nSystem: {}\nUptime: {}\nLoad average: 1m:{}% 5m:{}% 15m:{}%\n",
-            self.system_info.host_name,
-            self.system_info.kernel_version,
+            self.sysinfo.overview.host_name,
+            self.sysinfo.overview.kernel_version,
             uptime,
-            self.system_info.load_one_minute,
-            self.system_info.load_five_minutes,
-            self.system_info.load_fifteen_minutes
+            self.sysinfo.overview.load_one_minute,
+            self.sysinfo.overview.load_five_minutes,
+            self.sysinfo.overview.load_fifteen_minutes
         );
 
         let paragraph = Paragraph::new(text).block(block);

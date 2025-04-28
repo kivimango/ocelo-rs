@@ -1,4 +1,5 @@
 use crate::component::OverView;
+use core::model::SystemOverviewInfo;
 use std::time::Duration;
 use tuirealm::terminal::{TerminalBridge, TermionTerminalAdapter};
 use tuirealm::{Application, EventListenerCfg, NoUserEvent, PollStrategy, Update};
@@ -41,9 +42,11 @@ impl Default for View {
 
         let cpu_info = core::get_cpu_info();
         let system_info = core::get_system_info();
-        let overview = OverView::default()
-            .with_cpu_info(cpu_info)
-            .with_system_info(system_info);
+        let overview_info = SystemOverviewInfo {
+            cpu: cpu_info,
+            overview: system_info,
+        };
+        let overview = OverView::default().with_system_info(overview_info);
 
         tuirealm
             .mount(Components::Overvieww, Box::new(overview), vec![])
