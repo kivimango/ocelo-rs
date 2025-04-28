@@ -1,5 +1,7 @@
+use serde::{Deserialize, Serialize};
+
 ///  Detailed information collected about the main processor.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CpuInfo {
     /// Full name of the processor, like Intel Core i5-6500
     pub name: String,
