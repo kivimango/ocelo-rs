@@ -9,12 +9,16 @@ pub use system::*;
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 /// Stores memory-related statistics.
 pub struct MemoryInfo {
-    /// Total avaiable memory for this machine in bytes
+    /// Total available memory for this machine in bytes
     pub total: u64,
     /// Used memory from in bytes
     pub used: u64,
     /// Reamining available memory from `self.total` in bytes
     pub available: u64,
+    /// Swap page/file information
+    pub swap_total: u64,
+    pub swap_used: u64,
+    pub swap_available: u64,
 }
 
 /// Collection of system information to be displayed in the Overview component.
@@ -27,7 +31,7 @@ pub struct SystemOverviewInfo {
 
 impl SystemOverviewInfo {
     /// Creates `self` from a JSON reprentation
-    pub fn from_json(value: &String) -> Result<Self, serde_json::Error> {
-        serde_json::from_str(&value)
+    pub fn from_json(value: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(value)
     }
 }

@@ -10,7 +10,7 @@ pub fn get_cpu_info() -> CpuInfo {
 
     let cpus = sys.cpus();
     let name = cpus
-        .get(0)
+        .first()
         .map(|cpu| cpu.brand().to_string())
         .unwrap_or_else(|| "Unknown".to_string());
 
@@ -36,11 +36,17 @@ pub fn get_memory_info() -> MemoryInfo {
     let total = sysinfo.total_memory();
     let used = sysinfo.used_memory();
     let available = sysinfo.available_memory();
+    let swap_total = sysinfo.total_swap();
+    let swap_used = sysinfo.used_swap();
+    let swap_available = sysinfo.free_swap();
 
     MemoryInfo {
         total,
         used,
         available,
+        swap_total,
+        swap_used,
+        swap_available,
     }
 }
 
