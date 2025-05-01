@@ -13,18 +13,10 @@ use tuirealm::{
 
 use crate::view::Message;
 
+#[derive(Default)]
 pub struct OverView {
     properties: Props,
     sysinfo: SystemOverviewInfo,
-}
-
-impl Default for OverView {
-    fn default() -> Self {
-        Self {
-            properties: Props::default(),
-            sysinfo: SystemOverviewInfo::default(),
-        }
-    }
 }
 
 impl OverView {
@@ -135,8 +127,13 @@ impl OverView {
             .title_alignment(ratatui::layout::Alignment::Left);
 
         let text = format!(
-            "Total: {}\nUsed: {}\nAvailable: {}",
-            self.sysinfo.memory.total, self.sysinfo.memory.used, self.sysinfo.memory.available,
+            "Total: {} Swap total: {}\nUsed: {} Swap total: {}\nAvailable: {} Swap available: {}",
+            self.sysinfo.memory.total,
+            self.sysinfo.memory.swap_total,
+            self.sysinfo.memory.used,
+            self.sysinfo.memory.swap_used,
+            self.sysinfo.memory.available,
+            self.sysinfo.memory.swap_available,
         );
 
         let paragraph = Paragraph::new(text).block(block);
