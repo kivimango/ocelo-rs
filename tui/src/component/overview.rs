@@ -71,8 +71,13 @@ impl MockComponent for OverView {
                 Constraint::Percentage(25),
             ])
             .chunks(area);
+        let cpu_memory_chunk = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(&[Constraint::Percentage(50), Constraint::Percentage(50)])
+            .chunks(chunks[1]);
         self.render_system_info(frame, chunks[0]);
-        self.render_cpu_info(frame, chunks[1]);
+        self.render_cpu_info(frame, cpu_memory_chunk[0]);
+        self.render_memory_info(frame, cpu_memory_chunk[1]);
     }
 }
 
@@ -115,6 +120,27 @@ impl OverView {
         let paragraph = Paragraph::new(text).block(block);
 
         frame.render_widget(paragraph, cpu_area[0]);
+    }
+
+    fn render_memory_info(&self, frame: &mut Frame, area: Rect) {
+        let memory_area = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(&[Constraint::Fill(1)])
+            .chunks(area);
+
+        let block = tuirealm::ratatui::widgets::Block::default()
+            .border_type(tuirealm::props::BorderType::Rounded)
+            .borders(Borders::ALL)
+            .title("Memory")
+            .title_alignment(ratatui::layout::Alignment::Left);
+
+        let text = format!(
+            "Total: {}\nUsed: {}\nAvailable: {}",
+            self.sysinfo.memory.total, self.sysinfo.memory.used, self.sysinfo.memory.available,
+        );
+
+        let paragraph = Paragraph::new(text).block(block);
+        frame.render_widget(paragraph, memory_area[0]);
     }
 
     fn render_system_info(&self, frame: &mut Frame, area: Rect) {
