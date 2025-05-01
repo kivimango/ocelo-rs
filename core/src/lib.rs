@@ -1,6 +1,7 @@
 pub mod model;
 
 pub use self::model::{CpuInfo, SystemInfo};
+use model::MemoryInfo;
 use sysinfo::System;
 
 pub fn get_cpu_info() -> CpuInfo {
@@ -27,6 +28,19 @@ pub fn get_cpu_info() -> CpuInfo {
         frequency: average_frequency,
         core_count,
         temperature: None,
+    }
+}
+
+pub fn get_memory_info() -> MemoryInfo {
+    let sysinfo = System::new_all();
+    let total = sysinfo.total_memory();
+    let used = sysinfo.used_memory();
+    let available = sysinfo.available_memory();
+
+    MemoryInfo {
+        total,
+        used,
+        available,
     }
 }
 
