@@ -1,4 +1,5 @@
 use core::model::SystemOverviewInfo;
+use humansize::{BaseUnit, FormatSize, FormatSizeOptions};
 use tuirealm::{
     command::{Cmd, CmdResult},
     event::{Key, KeyEvent},
@@ -117,7 +118,8 @@ impl OverView {
     fn render_memory_info(&self, frame: &mut Frame, area: Rect) {
         let memory_area = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(&[Constraint::Fill(1)])
+            .constraints(&[Constraint::Percentage(50), Constraint::Percentage(50)])
+            .margin(1)
             .chunks(area);
 
         let block = tuirealm::ratatui::widgets::Block::default()
@@ -126,18 +128,45 @@ impl OverView {
             .title("Memory")
             .title_alignment(ratatui::layout::Alignment::Left);
 
-        let text = format!(
-            "Total: {} Swap total: {}\nUsed: {} Swap total: {}\nAvailable: {} Swap available: {}",
-            self.sysinfo.memory.total,
-            self.sysinfo.memory.swap_total,
-            self.sysinfo.memory.used,
-            self.sysinfo.memory.swap_used,
-            self.sysinfo.memory.available,
-            self.sysinfo.memory.swap_available,
+        let format_size_options = FormatSizeOptions::default()
+            .base_unit(BaseUnit::Byte)
+            .decimal_places(1)
+            .decimal_zeroes(0)
+            .kilo(humansize::Kilo::Binary)
+            .long_units(false)
+            .space_after_value(true);
+
+        let memory_text = format!(
+            "Total: {}\nUsed: {}\nAvailable: {}\n",
+            self.sysinfo.memory.total.format_size(format_size_options),
+            self.sysinfo.memory.used.format_size(format_size_options),
+            self.sysinfo
+                .memory
+                .available
+                .format_size(format_size_options),
+        );
+        let swap_text = format!(
+            "Total swap: {}\nUsed swap: {}\nAvailable swap: {}\n",
+            self.sysinfo
+                .memory
+                .swap_total
+                .format_size(format_size_options),
+            self.sysinfo
+                .memory
+                .swap_used
+                .format_size(format_size_options),
+            self.sysinfo
+                .memory
+                .swap_available
+                .format_size(format_size_options),
         );
 
-        let paragraph = Paragraph::new(text).block(block);
-        frame.render_widget(paragraph, memory_area[0]);
+        let memory_paragraph =
+            Paragraph::new(memory_text).alignment(ratatui::layout::Alignment::Left);
+        let swap_paragraph = Paragraph::new(swap_text).alignment(ratatui::layout::Alignment::Left);
+        frame.render_widget(block, area);
+        frame.render_widget(memory_paragraph, memory_area[0]);
+        frame.render_widget(swap_paragraph, memory_area[1]);
     }
 
     fn render_system_info(&self, frame: &mut Frame, area: Rect) {
