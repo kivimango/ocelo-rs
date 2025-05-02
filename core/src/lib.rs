@@ -20,6 +20,7 @@ pub fn get_cpu_info() -> CpuInfo {
     } else {
         0
     };
+    let usage = sys.global_cpu_usage();
 
     //let temperature = cpus.get(0).and_then(|c| c.temperature()); // Option<f32>
 
@@ -28,6 +29,7 @@ pub fn get_cpu_info() -> CpuInfo {
         frequency: average_frequency,
         core_count,
         temperature: None,
+        usage,
     }
 }
 

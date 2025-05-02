@@ -12,6 +12,9 @@ pub struct CpuInfo {
     /// The physical core count
     pub core_count: usize,
 
+    /// CPU usage in percentage
+    pub usage: f32,
+
     /// The reported temperature of the processor.
     /// On some platforms, this information is not available
     pub temperature: Option<f32>,
