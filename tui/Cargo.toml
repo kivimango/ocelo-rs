@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+humansize = { version = "2.1.3", features = ["impl_style"] }
 tuirealm = { version = "2.1.0", default-features = false, features = [
     "termion",
 ] }
