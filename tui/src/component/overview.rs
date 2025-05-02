@@ -1,5 +1,6 @@
 use core::model::SystemOverviewInfo;
 use humansize::{BaseUnit, FormatSize, FormatSizeOptions};
+use ratatui::widgets::Gauge;
 use tuirealm::{
     command::{Cmd, CmdResult},
     event::{Key, KeyEvent},
@@ -90,7 +91,8 @@ impl OverView {
     fn render_cpu_info(&self, frame: &mut Frame, area: Rect) {
         let cpu_area = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(&[Constraint::Fill(1)])
+            .constraints(&[Constraint::Percentage(50), Constraint::Percentage(50)])
+            .margin(1)
             .chunks(area);
 
         let block = tuirealm::ratatui::widgets::Block::default()
@@ -110,9 +112,13 @@ impl OverView {
                 .map_or("N/A".into(), |t| format!("{:.1}°C", t))
         );
 
-        let paragraph = Paragraph::new(text).block(block);
+        let paragraph = Paragraph::new(text);
 
+        let usage_gauge = Gauge::default().ratio(self.sysinfo.cpu.usage as f64 / 100.0);
+
+        frame.render_widget(block, area);
         frame.render_widget(paragraph, cpu_area[0]);
+        frame.render_widget(usage_gauge, cpu_area[1]);
     }
 
     fn render_memory_info(&self, frame: &mut Frame, area: Rect) {
