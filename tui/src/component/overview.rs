@@ -19,13 +19,50 @@ use tuirealm::{
 pub struct OverView {
     properties: Props,
     sysinfo: SystemOverviewInfo,
+    /// Pre-calculated information for the top 3 used space drive
+    disk_usage: String,
 }
 
 impl OverView {
     /// Sets the system information during initalization of the component.
     pub fn with_system_info(mut self, system_info: SystemOverviewInfo) -> Self {
         self.sysinfo = system_info;
+        self.disk_usage = self.calculate_disk_usage_info();
         self
+    }
+
+    fn calculate_disk_usage_info(&self) -> String {
+        let format_opts = FormatSizeOptions::default()
+            .base_unit(BaseUnit::Byte)
+            .decimal_places(1)
+            .decimal_zeroes(0)
+            .kilo(humansize::Kilo::Binary)
+            .long_units(false)
+            .space_after_value(true);
+
+        let text = self
+            .sysinfo
+            .disks
+            .disks
+            .iter()
+            .take(3)
+            .map(|d| {
+                let percent = if d.total_space == 0 {
+                    0.0
+                } else {
+                    d.used_space as f64 / d.total_space as f64 * 100.0
+                };
+                format!(
+                    "{:<10} {:>5.1}%  {:>8} / {:<8}",
+                    d.mount,
+                    percent,
+                    d.used_space.format_size(format_opts),
+                    d.total_space.format_size(format_opts),
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        text
     }
 }
 
@@ -131,7 +168,11 @@ impl OverView {
     fn render_disks_info(&self, frame: &mut Frame, area: Rect) {
         let disks_area = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(&[Constraint::Fill(1)])
+            .constraints(&[
+                Constraint::Percentage(25),
+                Constraint::Percentage(25),
+                Constraint::Percentage(25),
+            ])
             .margin(1)
             .chunks(area);
         let block = Block::default()
@@ -150,17 +191,28 @@ impl OverView {
 
         let total_space: u64 = self.sysinfo.disks.disks.iter().map(|d| d.total_space).sum();
         let used_space: u64 = self.sysinfo.disks.disks.iter().map(|d| d.used_space).sum();
+        let device_count = self.sysinfo.disks.disks.len();
         let available_space = total_space - used_space;
         let text = format!(
-            "Total mass storage space: {}\nUsed space: {}\nAvailable space: {}\n",
+            "Total mass storage space: {}\nUsed space: {}\nAvailable space: {}\nDevice count: {}",
             total_space.format_size(format_size_options),
             used_space.format_size(format_size_options),
-            available_space.format_size(format_size_options)
+            available_space.format_size(format_size_options),
+            device_count
         );
         let paragraph = Paragraph::new(text);
 
+        let percent = (used_space as f64 / total_space as f64) * 100.0;
+        let gauge = Gauge::default()
+            .percent(percent as u16)
+            .gauge_style(get_color_for(percent));
+
+        let top3_usage = Paragraph::new(self.disk_usage.clone());
+
         frame.render_widget(block, area);
         frame.render_widget(paragraph, disks_area[0]);
+        frame.render_widget(gauge, disks_area[1]);
+        frame.render_widget(top3_usage, disks_area[2]);
     }
 
     fn render_memory_info(&self, frame: &mut Frame, area: Rect) {
