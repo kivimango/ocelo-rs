@@ -22,8 +22,6 @@ pub fn get_cpu_info() -> CpuInfo {
     };
     let usage = sys.global_cpu_usage();
 
-    //let temperature = cpus.get(0).and_then(|c| c.temperature()); // Option<f32>
-
     CpuInfo {
         name,
         frequency: average_frequency,
@@ -35,10 +33,11 @@ pub fn get_cpu_info() -> CpuInfo {
 
 pub fn get_disk_info() -> DiskInfo {
     let disks = Disks::new_with_refreshed_list();
+    let mut disks = disks.iter().map(Storage::from).collect::<Vec<Storage>>();
+    disks.sort_by_key(|d| d.used_space);
+    disks.reverse();
 
-    DiskInfo {
-        disks: disks.iter().map(Storage::from).collect(),
-    }
+    DiskInfo { disks: disks }
 }
 
 pub fn get_memory_info() -> MemoryInfo {
