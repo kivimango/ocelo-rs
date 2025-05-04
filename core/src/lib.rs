@@ -1,8 +1,8 @@
 pub mod model;
 
 pub use self::model::{CpuInfo, SystemInfo};
-use model::MemoryInfo;
-use sysinfo::System;
+use model::{DiskInfo, MemoryInfo, Storage};
+use sysinfo::{Disks, System};
 
 pub fn get_cpu_info() -> CpuInfo {
     let mut sys = System::new_all();
@@ -30,6 +30,14 @@ pub fn get_cpu_info() -> CpuInfo {
         core_count,
         temperature: None,
         usage,
+    }
+}
+
+pub fn get_disk_info() -> DiskInfo {
+    let disks = Disks::new_with_refreshed_list();
+
+    DiskInfo {
+        disks: disks.iter().map(Storage::from).collect(),
     }
 }
 

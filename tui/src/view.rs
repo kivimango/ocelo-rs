@@ -46,12 +46,14 @@ impl Default for View {
         );
 
         let cpu_info = core::get_cpu_info();
+        let disks = core::get_disk_info();
         let system_info = core::get_system_info();
         let memory_info = core::get_memory_info();
         let overview_info = SystemOverviewInfo {
             cpu: cpu_info,
             overview: system_info,
             memory: memory_info,
+            disks,
         };
         let overview = OverView::default().with_system_info(overview_info);
 
@@ -65,10 +67,12 @@ impl Default for View {
         let (tx, rx) = mpsc::channel();
         thread::spawn(move || loop {
             let cpu = core::get_cpu_info();
+            let disks = core::get_disk_info();
             let system_info = core::get_system_info();
             let memory_info = core::get_memory_info();
             let overview = SystemOverviewInfo {
                 cpu,
+                disks,
                 overview: system_info,
                 memory: memory_info,
             };

@@ -1,9 +1,11 @@
 use serde::{Deserialize, Serialize};
 
 mod cpu;
+mod disk;
 mod system;
 
 pub use cpu::*;
+pub use disk::*;
 pub use system::*;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -27,6 +29,7 @@ pub struct SystemOverviewInfo {
     pub cpu: CpuInfo,
     pub overview: SystemInfo,
     pub memory: MemoryInfo,
+    pub disks: DiskInfo,
 }
 
 impl SystemOverviewInfo {
