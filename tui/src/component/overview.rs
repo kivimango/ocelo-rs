@@ -1,6 +1,8 @@
+use super::get_color_for;
+use crate::view::Message;
 use core::model::SystemOverviewInfo;
 use humansize::{BaseUnit, FormatSize, FormatSizeOptions};
-use ratatui::widgets::Gauge;
+use ratatui::widgets::{Block, Gauge};
 use tuirealm::{
     command::{Cmd, CmdResult},
     event::{Key, KeyEvent},
@@ -12,10 +14,6 @@ use tuirealm::{
     },
     AttrValue, Attribute, Component, Event, Frame, MockComponent, NoUserEvent, Props, State,
 };
-
-use crate::view::Message;
-
-use super::get_color_for;
 
 #[derive(Default)]
 pub struct OverView {
@@ -74,6 +72,7 @@ impl MockComponent for OverView {
         self.render_system_info(frame, chunks[0]);
         self.render_cpu_info(frame, cpu_memory_chunk[0]);
         self.render_memory_info(frame, cpu_memory_chunk[1]);
+        self.render_disks_info(frame, chunks[2]);
     }
 }
 
@@ -127,6 +126,41 @@ impl OverView {
         frame.render_widget(block, area);
         frame.render_widget(paragraph, cpu_area[0]);
         frame.render_widget(usage_gauge, cpu_area[2]);
+    }
+
+    fn render_disks_info(&self, frame: &mut Frame, area: Rect) {
+        let disks_area = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(&[Constraint::Fill(1)])
+            .margin(1)
+            .chunks(area);
+        let block = Block::default()
+            .border_type(tuirealm::props::BorderType::Rounded)
+            .borders(Borders::ALL)
+            .title("Mass storage")
+            .title_alignment(ratatui::layout::Alignment::Left);
+
+        let format_size_options = FormatSizeOptions::default()
+            .base_unit(BaseUnit::Byte)
+            .decimal_places(1)
+            .decimal_zeroes(0)
+            .kilo(humansize::Kilo::Binary)
+            .long_units(false)
+            .space_after_value(true);
+
+        let total_space: u64 = self.sysinfo.disks.disks.iter().map(|d| d.total_space).sum();
+        let used_space: u64 = self.sysinfo.disks.disks.iter().map(|d| d.used_space).sum();
+        let available_space = total_space - used_space;
+        let text = format!(
+            "Total mass storage space: {}\nUsed space: {}\nAvailable space: {}\n",
+            total_space.format_size(format_size_options),
+            used_space.format_size(format_size_options),
+            available_space.format_size(format_size_options)
+        );
+        let paragraph = Paragraph::new(text);
+
+        frame.render_widget(block, area);
+        frame.render_widget(paragraph, disks_area[0]);
     }
 
     fn render_memory_info(&self, frame: &mut Frame, area: Rect) {
