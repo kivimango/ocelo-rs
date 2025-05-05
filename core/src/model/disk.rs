@@ -9,6 +9,8 @@ pub struct Storage {
     pub available_space: u64,
     pub file_system: String,
     pub mount: String,
+    pub bytes_read: u64,
+    pub bytes_written: u64,
 }
 
 impl From<&Disk> for Storage {
@@ -19,6 +21,8 @@ impl From<&Disk> for Storage {
             available_space: disk.available_space(),
             file_system: disk.file_system().to_string_lossy().into_owned(),
             mount: disk.mount_point().to_string_lossy().to_string(),
+            bytes_read: disk.usage().read_bytes,
+            bytes_written: disk.usage().written_bytes,
         }
     }
 }
