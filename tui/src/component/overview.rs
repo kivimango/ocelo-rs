@@ -1,7 +1,7 @@
 use super::get_color_for;
 use crate::view::Message;
 use core::model::SystemOverviewInfo;
-use humansize::{BaseUnit, FormatSize, FormatSizeOptions};
+use humansize::{BaseUnit, FormatSize, FormatSizeOptions, Kilo};
 use ratatui::widgets::{Block, Gauge};
 use tuirealm::{
     command::{Cmd, CmdResult},
@@ -172,6 +172,7 @@ impl OverView {
                 Constraint::Percentage(25),
                 Constraint::Percentage(25),
                 Constraint::Percentage(25),
+                Constraint::Percentage(25),
             ])
             .margin(1)
             .chunks(area);
@@ -209,10 +210,35 @@ impl OverView {
 
         let top3_usage = Paragraph::new(self.disk_usage.clone());
 
+        let read_bytes_sum = self
+            .sysinfo
+            .disks
+            .disks
+            .iter()
+            .map(|s| s.bytes_read)
+            .sum::<u64>();
+        let written_bytes_sum = self
+            .sysinfo
+            .disks
+            .disks
+            .iter()
+            .map(|s| s.bytes_written)
+            .sum::<u64>();
+        let io_format_opts = FormatSizeOptions::default()
+            .base_unit(BaseUnit::Byte)
+            .kilo(Kilo::Binary)
+            .decimal_places(1)
+            .long_units(false);
+        let read_speed = (read_bytes_sum / 3).format_size(io_format_opts);
+        let write_speed = (written_bytes_sum / 3).format_size(io_format_opts);
+        let io_stat_text = format!("Read: {} /s Write: {} /s", read_speed, write_speed);
+        let io_stat = Paragraph::new(io_stat_text);
+
         frame.render_widget(block, area);
         frame.render_widget(paragraph, disks_area[0]);
         frame.render_widget(gauge, disks_area[1]);
         frame.render_widget(top3_usage, disks_area[2]);
+        frame.render_widget(io_stat, disks_area[3]);
     }
 
     fn render_memory_info(&self, frame: &mut Frame, area: Rect) {
