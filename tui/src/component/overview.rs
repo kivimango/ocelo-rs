@@ -110,6 +110,7 @@ impl MockComponent for OverView {
         self.render_cpu_info(frame, cpu_memory_chunk[0]);
         self.render_memory_info(frame, cpu_memory_chunk[1]);
         self.render_disks_info(frame, chunks[2]);
+        self.render_network_info(frame, chunks[3]);
     }
 }
 
@@ -293,6 +294,42 @@ impl OverView {
         frame.render_widget(block, area);
         frame.render_widget(memory_paragraph, memory_area[0]);
         frame.render_widget(swap_paragraph, memory_area[1]);
+    }
+
+    fn render_network_info(&self, frame: &mut Frame, area: Rect) {
+        let network_area = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(&[Constraint::Fill(1)])
+            .chunks(area);
+
+        let block = Block::default()
+            .title("Network")
+            .borders(Borders::ALL)
+            .border_type(tuirealm::props::BorderType::Rounded);
+
+        let format_opts = FormatSizeOptions::default()
+            .base_unit(BaseUnit::Byte)
+            .kilo(Kilo::Binary)
+            .decimal_places(1)
+            .space_after_value(true)
+            .long_units(false);
+
+        let text = format!(
+            "Interfaces: {}\nTotal received: {} Total packets received: {} Total errors on receive: {}\nTotal transmitted: {} Total packets transmitted: {} Total errors on transmitted: {}",
+            self.sysinfo.network.interfaces,
+            self.sysinfo.network.total_received.format_size(format_opts),
+            self.sysinfo.network.total_packets_received,
+            self.sysinfo.network.total_errors_on_received,
+            self.sysinfo
+                .network
+                .total_transmitted
+                .format_size(format_opts),
+                self.sysinfo.network.total_packets_transmitted,
+                self.sysinfo.network.total_errors_on_transmitted                
+        );
+
+        let paragraph = Paragraph::new(text).block(block);
+        frame.render_widget(paragraph, network_area[0]);
     }
 
     fn render_system_info(&self, frame: &mut Frame, area: Rect) {
