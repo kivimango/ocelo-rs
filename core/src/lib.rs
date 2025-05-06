@@ -1,8 +1,8 @@
 pub mod model;
 
 pub use self::model::{CpuInfo, SystemInfo};
-use model::{DiskInfo, MemoryInfo, Storage};
-use sysinfo::{Disks, System};
+use model::{DiskInfo, MemoryInfo, NetworkInfo, Storage};
+use sysinfo::{Disks, Networks, System};
 
 pub fn get_cpu_info() -> CpuInfo {
     let mut sys = System::new_all();
@@ -57,6 +57,11 @@ pub fn get_memory_info() -> MemoryInfo {
         swap_used,
         swap_available,
     }
+}
+
+pub fn get_network_info() -> NetworkInfo {
+    let networks = Networks::new_with_refreshed_list();
+    NetworkInfo::from(networks)
 }
 
 pub fn get_system_info() -> SystemInfo {

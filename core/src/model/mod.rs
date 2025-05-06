@@ -32,6 +32,7 @@ pub struct SystemOverviewInfo {
     pub overview: SystemInfo,
     pub memory: MemoryInfo,
     pub disks: DiskInfo,
+    pub network: NetworkInfo,
 }
 
 impl SystemOverviewInfo {
