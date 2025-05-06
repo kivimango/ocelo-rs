@@ -2,10 +2,12 @@ use serde::{Deserialize, Serialize};
 
 mod cpu;
 mod disk;
+mod network;
 mod system;
 
 pub use cpu::*;
 pub use disk::*;
+pub use network::*;
 pub use system::*;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
