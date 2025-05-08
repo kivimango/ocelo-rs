@@ -20,8 +20,8 @@ pub struct NetworkInfo {
     pub total_errors_on_transmitted: u64,
 }
 
-impl From<Networks> for NetworkInfo {
-    fn from(networks: Networks) -> Self {
+impl From<&Networks> for NetworkInfo {
+    fn from(networks: &Networks) -> Self {
         let total_received = networks.iter().map(|n| n.1.total_received()).sum::<u64>();
         let total_transmitted = networks
             .iter()

@@ -1,5 +1,6 @@
 use crate::component::{Menu, MenuState, OverView};
 use core::model::SystemOverviewInfo;
+use core::SystemInfoPoller;
 use ratatui::layout::{Constraint, Direction, Layout};
 use std::sync::mpsc::{self, Receiver};
 use std::thread;
@@ -52,7 +53,7 @@ impl Default for View {
             EventListenerCfg::default().termion_input_listener(Duration::from_millis(33), 1),
         );
 
-        let cpu_info = core::get_cpu_info();
+        /*let cpu_info = core::get_cpu_info();
         let disks = core::get_disk_info();
         let system_info = core::get_system_info();
         let memory_info = core::get_memory_info();
@@ -63,8 +64,8 @@ impl Default for View {
             memory: memory_info,
             disks,
             network,
-        };
-        let overview = OverView::default().with_system_info(overview_info);
+        };*/
+        let overview = OverView::default(); //.with_system_info(overview_info);
 
         tuirealm
             .mount(Components::Menu, Box::new(Menu::default()), vec![])
@@ -76,20 +77,12 @@ impl Default for View {
             .active(&Components::Overvieww)
             .expect("Failed to activate overview component!");
 
+        let mut poller = SystemInfoPoller::new();
+        poller.init();
+
         let (tx, rx) = mpsc::channel();
         thread::spawn(move || loop {
-            let cpu = core::get_cpu_info();
-            let disks = core::get_disk_info();
-            let system_info = core::get_system_info();
-            let memory_info = core::get_memory_info();
-            let network_info = core::get_network_info();
-            let overview = SystemOverviewInfo {
-                cpu,
-                disks,
-                overview: system_info,
-                memory: memory_info,
-                network: network_info,
-            };
+            let overview = poller.get_system_overview();
 
             if let Err(error) = tx.send(overview) {
                 eprintln!("Failed to send system overview information: {}", error);
