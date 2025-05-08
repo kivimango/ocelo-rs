@@ -58,7 +58,7 @@ impl MockComponent for Menu {
     }
 
     fn view(&mut self, frame: &mut Frame, area: Rect) {
-        let titles = ["Overview", "CPU & Memory", "Disk", "Network"]
+        let titles = ["Overview", "CPU & Memory", "Processes", "Disk", "Network"]
             .iter()
             .map(|t| (*t).into())
             .collect::<Vec<String>>();
@@ -90,6 +90,10 @@ impl Component<Message, NoUserEvent> for Menu {
                 code: Key::Backspace,
                 ..
             }) => Some(Message::ChangePreviousMenu),
+            Event::Keyboard(KeyEvent {
+                code: Key::Char('q') | Key::Esc | Key::Function(10),
+                ..
+            }) => Some(Message::Quit),
             _ => None,
         }
     }

@@ -5,7 +5,6 @@ use humansize::{BaseUnit, FormatSize, FormatSizeOptions, Kilo};
 use ratatui::widgets::{Block, Gauge};
 use tuirealm::{
     command::{Cmd, CmdResult},
-    event::{Key, KeyEvent},
     props::Layout,
     ratatui::{
         layout::{Constraint, Direction},
@@ -115,14 +114,8 @@ impl MockComponent for OverView {
 }
 
 impl Component<Message, NoUserEvent> for OverView {
-    fn on(&mut self, event: Event<NoUserEvent>) -> Option<Message> {
-        match event {
-            Event::Keyboard(KeyEvent {
-                code: Key::Char('q') | Key::Esc | Key::Function(10),
-                ..
-            }) => Some(Message::Quit),
-            _ => None,
-        }
+    fn on(&mut self, _event: Event<NoUserEvent>) -> Option<Message> {
+        None
     }
 }
 
