@@ -1,6 +1,8 @@
 use ratatui::style::{Style, Stylize};
 
+mod menu;
 mod overview;
+pub use self::menu::*;
 pub use self::overview::*;
 
 pub fn get_color_for(percentage: f64) -> Style {

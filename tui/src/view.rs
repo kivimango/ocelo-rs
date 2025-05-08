@@ -1,5 +1,6 @@
-use crate::component::OverView;
+use crate::component::{Menu, MenuState, OverView};
 use core::model::SystemOverviewInfo;
+use ratatui::layout::{Constraint, Direction, Layout};
 use std::sync::mpsc::{self, Receiver};
 use std::thread;
 use std::time::Duration;
@@ -8,15 +9,21 @@ use tuirealm::{Application, EventListenerCfg, NoUserEvent, PollStrategy, Update}
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum Components {
+    Menu,
     Overvieww,
 }
 
 #[derive(PartialEq)]
 pub enum Message {
+    ChangeNextMenu,
+    ChangePreviousMenu,
     Quit,
 }
 
 pub struct View {
+    /// The currently selected tab in the upper menu
+    current_tab: MenuState,
+
     /// Signals the main loop to quit, thus starting to close the app
     quit: bool,
 
@@ -60,6 +67,9 @@ impl Default for View {
         let overview = OverView::default().with_system_info(overview_info);
 
         tuirealm
+            .mount(Components::Menu, Box::new(Menu::default()), vec![])
+            .unwrap();
+        tuirealm
             .mount(Components::Overvieww, Box::new(overview), vec![])
             .expect("Failed to mount overview component!");
         tuirealm
@@ -90,6 +100,7 @@ impl Default for View {
         });
 
         View {
+            current_tab: MenuState::default(),
             quit: false,
             // render the screen at least one time
             redraw: true,
@@ -105,8 +116,13 @@ impl View {
         assert!(self
             .terminal
             .draw(|frame| {
-                self.tuirealm
-                    .view(&Components::Overvieww, frame, frame.area());
+                let layout = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints(&[Constraint::Length(3), Constraint::Fill(1)])
+                    .split(frame.area());
+
+                self.tuirealm.view(&Components::Menu, frame, layout[0]);
+                self.tuirealm.view(&Components::Overvieww, frame, layout[1]);
             })
             .is_ok())
     }
@@ -176,9 +192,9 @@ impl Update<Message> for View {
     fn update(&mut self, msg: Option<Message>) -> Option<Message> {
         if let Some(message) = msg {
             match message {
-                Message::Quit => {
-                    self.quit = true;
-                }
+                Message::ChangeNextMenu => self.current_tab.next(),
+                Message::ChangePreviousMenu => self.current_tab.previous(),
+                Message::Quit => self.quit = true,
             }
         }
 
