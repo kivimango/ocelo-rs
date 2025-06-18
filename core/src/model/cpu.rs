@@ -19,3 +19,9 @@ pub struct CpuInfo {
     /// On some platforms, this information is not available
     pub temperature: Option<f32>,
 }
+
+pub struct CpuCore {
+    pub usage: u64,
+    pub frequency: u64,
+    pub temperature: u32,
+}
