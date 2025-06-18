@@ -1,7 +1,9 @@
 use ratatui::style::{Style, Stylize};
 
+mod cpu_details;
 mod menu;
 mod overview;
+pub use self::cpu_details::*;
 pub use self::menu::*;
 pub use self::overview::*;
 
