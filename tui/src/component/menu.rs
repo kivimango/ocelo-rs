@@ -100,7 +100,7 @@ impl Component<Message, NoUserEvent> for Menu {
 }
 
 /// Describes the selectable tabs in the upper menu.
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 pub enum MenuState {
     #[default]
     OverView,
@@ -133,11 +133,11 @@ impl MenuState {
 
     pub fn previous(&mut self) {
         match self {
-            Self::OverView => *self = Self::CpuMemoryDetails,
-            Self::CpuMemoryDetails => *self = Self::ProcessDetails,
-            Self::ProcessDetails => *self = Self::DiskDetails,
-            Self::DiskDetails => *self = Self::NetworkDetails,
-            Self::NetworkDetails => *self = Self::OverView,
+            Self::OverView => *self = Self::NetworkDetails,
+            Self::CpuMemoryDetails => *self = Self::OverView,
+            Self::ProcessDetails => *self = Self::CpuMemoryDetails,
+            Self::DiskDetails => *self = Self::ProcessDetails,
+            Self::NetworkDetails => *self = Self::DiskDetails,
         }
     }
 }
