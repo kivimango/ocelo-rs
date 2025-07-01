@@ -1,17 +1,31 @@
-use crate::component::{Menu, MenuState, OverView};
-use core::model::SystemOverviewInfo;
-use core::SystemInfoPoller;
-use ratatui::layout::{Constraint, Direction, Layout};
+use crate::component::{CpuMemoryDetails, Menu, MenuState, OverView};
+use core::{SharedSystemInfoPoller, SystemInfoPoller, SystemInfoPollingContext, SystemInfoUpdate};
+use ratatui::layout::{Constraint, Layout};
 use std::sync::mpsc::{self, Receiver};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use tuirealm::terminal::{TerminalBridge, TermionTerminalAdapter};
-use tuirealm::{Application, EventListenerCfg, NoUserEvent, PollStrategy, Update};
+use tuirealm::{
+    Application, AttrValue, Attribute, EventListenerCfg, NoUserEvent, PollStrategy, Sub, SubClause,
+    Update,
+};
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Components {
+    CpuDetails,
     Menu,
     Overvieww,
+}
+
+impl From<&MenuState> for Components {
+    fn from(menu_state: &MenuState) -> Self {
+        match menu_state {
+            MenuState::OverView => Self::Overvieww,
+            MenuState::CpuMemoryDetails => Self::CpuDetails,
+            _ => Self::Overvieww,
+        }
+    }
 }
 
 #[derive(PartialEq)]
@@ -19,6 +33,7 @@ pub enum Message {
     ChangeNextMenu,
     ChangePreviousMenu,
     Quit,
+    Tick,
 }
 
 pub struct View {
@@ -35,8 +50,10 @@ pub struct View {
     tuirealm: Application<Components, Message, NoUserEvent>,
     terminal: TerminalBridge<TermionTerminalAdapter>,
 
+    system_info: SharedSystemInfoPoller,
+
     /// Receives updates from the background thread.
-    sysinfo_rx: Receiver<SystemOverviewInfo>,
+    sysinfo_rx: Receiver<SystemInfoUpdate>,
 }
 
 impl Default for View {
@@ -53,40 +70,38 @@ impl Default for View {
             EventListenerCfg::default().termion_input_listener(Duration::from_millis(33), 1),
         );
 
-        /*let cpu_info = core::get_cpu_info();
-        let disks = core::get_disk_info();
-        let system_info = core::get_system_info();
-        let memory_info = core::get_memory_info();
-        let network = core::get_network_info();
-        let overview_info = SystemOverviewInfo {
-            cpu: cpu_info,
-            overview: system_info,
-            memory: memory_info,
-            disks,
-            network,
-        };*/
-        let overview = OverView::default(); //.with_system_info(overview_info);
+        let overview = OverView::default();
 
         tuirealm
-            .mount(Components::Menu, Box::new(Menu::default()), vec![])
+            .mount(
+                Components::Menu,
+                Box::new(Menu::default()),
+                vec![Sub::new(tuirealm::SubEventClause::Any, SubClause::Always)],
+            )
             .unwrap();
         tuirealm
             .mount(Components::Overvieww, Box::new(overview), vec![])
             .expect("Failed to mount overview component!");
-        tuirealm
-            .active(&Components::Overvieww)
-            .expect("Failed to activate overview component!");
+        tuirealm.active(&Components::Overvieww).unwrap();
 
-        let mut poller = SystemInfoPoller::new();
+        let mut poller = SystemInfoPoller::default();
         poller.init();
+        let shared_poller = Arc::new(Mutex::new(poller));
+        let poller_clone = shared_poller.clone();
 
         let (tx, rx) = mpsc::channel();
         thread::spawn(move || loop {
-            let overview = poller.get_system_overview();
+            match poller_clone.lock() {
+                Ok(mut poller) => {
+                    let ctx = poller.polling_context();
+                    let update = SystemInfoUpdate::from((&ctx, &mut *poller));
 
-            if let Err(error) = tx.send(overview) {
-                eprintln!("Failed to send system overview information: {}", error);
-                break;
+                    if let Err(error) = tx.send(update) {
+                        eprintln!("Failed to send system info update: {}", error);
+                        break;
+                    }
+                }
+                Err(error) => eprintln!("Error acquiring polling context lock: {}", error),
             }
 
             thread::sleep(Duration::from_secs(3));
@@ -99,6 +114,7 @@ impl Default for View {
             redraw: true,
             terminal,
             tuirealm,
+            system_info: shared_poller,
             sysinfo_rx: rx,
         }
     }
@@ -109,13 +125,11 @@ impl View {
         assert!(self
             .terminal
             .draw(|frame| {
-                let layout = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints(&[Constraint::Length(3), Constraint::Fill(1)])
+                let layout = Layout::vertical([Constraint::Length(3), Constraint::Fill(1)])
                     .split(frame.area());
-
+                let current_view = Components::from(&self.current_tab);
                 self.tuirealm.view(&Components::Menu, frame, layout[0]);
-                self.tuirealm.view(&Components::Overvieww, frame, layout[1]);
+                self.tuirealm.view(&current_view, frame, layout[1]);
             })
             .is_ok())
     }
@@ -124,23 +138,8 @@ impl View {
         while !self.quit {
             // if have update from the backend, receive it and convert it to json,
             // then update the Overview Component
-            if let Ok(sysinfo) = self.sysinfo_rx.try_recv() {
-                match sysinfo.to_json() {
-                    Ok(json) => {
-                        assert!(self
-                            .tuirealm
-                            .attr(
-                                &Components::Overvieww,
-                                tuirealm::Attribute::Custom("_SYSTEM_OVERVIEW"),
-                                tuirealm::AttrValue::String(json),
-                            )
-                            .is_ok());
-                        self.redraw = true;
-                    }
-                    Err(error) => {
-                        eprint!("Failed to create JSON from SystemOverviewInfo: {}", error)
-                    }
-                }
+            if let Ok(update) = self.sysinfo_rx.try_recv() {
+                self.handle_update(update);
             }
 
             match self.tuirealm.tick(PollStrategy::Once) {
@@ -179,14 +178,104 @@ impl View {
             .show_cursor()
             .expect("Failed to show cursor!");
     }
+
+    fn handle_update(&mut self, update: SystemInfoUpdate) {
+        match update {
+            SystemInfoUpdate::CpuAndMemory(cpu_update) => match cpu_update.to_json() {
+                Ok(cpu_update_json) => assert!(self
+                    .tuirealm
+                    .attr(
+                        &Components::CpuDetails,
+                        Attribute::Value,
+                        AttrValue::String(cpu_update_json)
+                    )
+                    .is_ok()),
+                Err(error) => eprint!("Failed to create JSON from CpuAndMemory: {}", error),
+            },
+            SystemInfoUpdate::Disk => {}
+            SystemInfoUpdate::Network => {}
+            SystemInfoUpdate::OverView(overview_update) => match overview_update.to_json() {
+                Ok(json) => {
+                    assert!(self
+                        .tuirealm
+                        .attr(
+                            &Components::Overvieww,
+                            tuirealm::Attribute::Custom("_SYSTEM_OVERVIEW"),
+                            tuirealm::AttrValue::String(json),
+                        )
+                        .is_ok());
+                }
+                Err(error) => {
+                    eprint!("Failed to create JSON from SystemOverviewInfo: {}", error)
+                }
+            },
+            SystemInfoUpdate::Process => {}
+        }
+
+        self.redraw = true;
+    }
+
+    fn switch_view(&mut self, tab: MenuState) {
+        match tab {
+            MenuState::CpuMemoryDetails => {
+                if !self.tuirealm.mounted(&Components::CpuDetails) {
+                    let cpu_info = self.system_info.lock().unwrap().get_cpu_info();
+                    self.tuirealm
+                        .mount(
+                            Components::CpuDetails,
+                            Box::new(
+                                CpuMemoryDetails::default()
+                                    .with_core_count(cpu_info.core_count)
+                                    .with_cpu_name(cpu_info.name),
+                            ),
+                            vec![],
+                        )
+                        .unwrap();
+                }
+                self.system_info
+                    .lock()
+                    .unwrap()
+                    .set_polling_context(SystemInfoPollingContext::CpuAndMemory);
+                self.tuirealm.blur().unwrap();
+                self.tuirealm.active(&Components::CpuDetails).unwrap();
+            }
+            MenuState::DiskDetails => {}
+            MenuState::NetworkDetails => {}
+            MenuState::OverView => {
+                self.system_info
+                    .lock()
+                    .unwrap()
+                    .set_polling_context(SystemInfoPollingContext::Overview);
+            }
+            MenuState::ProcessDetails => {}
+        }
+
+        self.tuirealm
+            .attr(
+                &Components::Menu,
+                Attribute::Value,
+                AttrValue::Length(self.current_tab.index()),
+            )
+            .unwrap();
+    }
 }
 
 impl Update<Message> for View {
     fn update(&mut self, msg: Option<Message>) -> Option<Message> {
         if let Some(message) = msg {
             match message {
-                Message::ChangeNextMenu => self.current_tab.next(),
-                Message::ChangePreviousMenu => self.current_tab.previous(),
+                Message::ChangeNextMenu => {
+                    self.current_tab.next();
+                    self.switch_view(self.current_tab);
+                }
+                Message::ChangePreviousMenu => {
+                    self.current_tab.previous();
+                    self.switch_view(self.current_tab);
+                }
+                Message::Tick => {
+                    self.redraw = true;
+                    self.switch_view(self.current_tab);
+                }
                 Message::Quit => self.quit = true,
             }
         }
