@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use super::MemoryInfo;
+
 ///  Detailed information collected about the main processor.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct CpuInfo {
@@ -20,8 +22,30 @@ pub struct CpuInfo {
     pub temperature: Option<f32>,
 }
 
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct CpuCore {
     pub usage: u64,
     pub frequency: u64,
     pub temperature: u32,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct CpuMemoryUpdate {
+    pub usage: f32,
+    pub frequency: usize,
+    pub temperature: usize,
+    pub cores: Vec<CpuCore>,
+    pub memory_stats: MemoryInfo,
+}
+
+impl CpuMemoryUpdate {
+    /// Creates `self` from a JSON reprentation.
+    pub fn from_json(value: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(value)
+    }
+
+    /// Creates tje JSON representation of `self`.
+    pub fn to_json(self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(&self)
+    }
 }
