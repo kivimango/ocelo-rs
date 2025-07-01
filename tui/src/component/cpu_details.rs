@@ -1,5 +1,6 @@
 use crate::Message;
-use core::model::CpuCore;
+use core::model::{CpuCore, CpuMemoryUpdate};
+use humansize::{BaseUnit, FormatSize, FormatSizeOptions};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
@@ -11,7 +12,6 @@ use ratatui::{
 };
 use tuirealm::{
     command::{Cmd, CmdResult},
-    event::{Key, KeyEvent},
     ratatui::prelude::Rect,
     AttrValue, Attribute, Component, Event, Frame, MockComponent, NoUserEvent, Props, State,
 };
@@ -20,14 +20,10 @@ use tuirealm::{
 pub struct CpuMemoryDetails {
     properties: Props,
 
+    cpu_update: CpuMemoryUpdate,
+
     /// Count of physical CPU cores
     core_count: usize,
-
-    /// current frequency of the gobal CPU in Hz
-    cpu_frequency: usize,
-
-    /// Global temperature of the CPU in Celsius degree
-    cpu_temperature: usize,
 
     /// Name of the CPU
     cpu_name: String,
@@ -38,6 +34,10 @@ pub struct CpuMemoryDetails {
     /// Indiviudal CPU core stats
     cpu_core_stats: Vec<CpuCore>,
 
+    /// The maximum frequency that the CPU reached during runtime.
+    /// It is needed for normalization in the core graphs.
+    max_frequency: usize,
+
     /// Physical memory usage over time in percent
     memory_usage: Vec<(f64, f64)>,
 
@@ -47,7 +47,17 @@ pub struct CpuMemoryDetails {
 
 impl MockComponent for CpuMemoryDetails {
     fn attr(&mut self, attr: Attribute, value: AttrValue) {
-        self.properties.set(attr, value);
+        if matches!(attr, Attribute::Value) {
+            if let Some(json_str) = value.as_string() {
+                if let Ok(update) = CpuMemoryUpdate::from_json(json_str) {
+                    self.process_update(update);
+                } else {
+                    eprintln!("failed to create from json");
+                }
+            } else {
+                self.properties.set(attr, value);
+            }
+        }
     }
 
     fn perform(&mut self, _cmd: Cmd) -> CmdResult {
@@ -66,7 +76,7 @@ impl MockComponent for CpuMemoryDetails {
         let block = Block::bordered();
         let layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(&[
+            .constraints([
                 Constraint::Percentage(33),
                 Constraint::Percentage(33),
                 Constraint::Percentage(33),
@@ -82,15 +92,8 @@ impl MockComponent for CpuMemoryDetails {
 }
 
 impl Component<Message, NoUserEvent> for CpuMemoryDetails {
-    fn on(&mut self, event: Event<NoUserEvent>) -> Option<Message> {
-        match event {
-            Event::Keyboard(KeyEvent { code: Key::Tab, .. }) => Some(Message::ChangeNextMenu),
-            Event::Keyboard(KeyEvent {
-                code: Key::Backspace,
-                ..
-            }) => Some(Message::ChangePreviousMenu),
-            _ => None,
-        }
+    fn on(&mut self, _event: Event<NoUserEvent>) -> Option<Message> {
+        None
     }
 }
 
@@ -108,19 +111,49 @@ impl CpuMemoryDetails {
         self
     }
 
-    /// Renders the CPU details in the left side of and an usage over time chart in the right side of the top third of the screen.
+    fn process_update(&mut self, update: CpuMemoryUpdate) {
+        let last_index = self.cpu_usage.len() as f64;
+        let cpu_usage = update.usage as f64;
+        self.cpu_usage.push((last_index, cpu_usage));
+
+        let memory_used_percent = if update.memory_stats.total > 0 {
+            (update.memory_stats.used as f64 / update.memory_stats.total as f64) * 100.0
+        } else {
+            0.0
+        };
+        let swap_used_percent = if update.memory_stats.swap_total > 0 {
+            (update.memory_stats.swap_used / update.memory_stats.total) as f64 * 100.0
+        } else {
+            0.0
+        };
+        let last_index = self.swap_usage.len() as f64;
+
+        self.memory_usage.push((last_index, memory_used_percent));
+        self.swap_usage.push((last_index, swap_used_percent));
+
+        if self.max_frequency < update.frequency {
+            self.max_frequency = update.frequency;
+        }
+
+        self.cpu_update = update;
+    }
+
+    /// Renders the CPU details in the left side and an usage over time chart in the right side of the top third of the screen.
     fn render_cpu_usage_chart(&self, frame: &mut Frame, area: Rect) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(&[Constraint::Percentage(25), Constraint::Fill(1)])
+            .constraints([Constraint::Percentage(25), Constraint::Fill(1)])
             .split(area);
 
-        let usage = self.cpu_usage.first().unwrap_or(&(0.0, 0.0));
         let cpu_main_info = format!(
-            "Name: {}\nCore count: {}\nUsage: {}%\nFrequency: {}\nTemperature: {}°C",
-            self.cpu_name, self.core_count, usage.0, self.cpu_frequency, self.cpu_temperature
+            "Name: {}\nCore count: {}\nUsage: {}%\nFrequency: {}Mhz\nTemperature: {}°C",
+            self.cpu_name,
+            self.core_count,
+            self.cpu_update.usage as usize,
+            self.cpu_update.frequency,
+            self.cpu_update.temperature
         );
-        let cpu_label = Paragraph::new(cpu_main_info);
+        let cpu_label = Paragraph::new(cpu_main_info).block(Block::bordered().reset());
 
         //--- CPU Usage Over Time ---
         let percent_axis = Axis::default()
@@ -150,7 +183,6 @@ impl CpuMemoryDetails {
             .block(
                 Block::bordered()
                     .title("CPU usage over time")
-                    .bold()
                     .title_alignment(Alignment::Center),
             )
             .x_axis(time_axis)
@@ -165,14 +197,23 @@ impl CpuMemoryDetails {
     fn render_core_details(&self, frame: &mut Frame, area: Rect) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(&[Constraint::Fill(1); 4])
+            .constraints([Constraint::Fill(1); 4])
             .split(area);
 
-        for (i, core) in self.cpu_core_stats.iter().enumerate() {
+        for (i, core) in self.cpu_update.cores.iter().enumerate() {
             let usage = core.usage;
             let usage_bar_color = match usage {
                 usage if usage < 50 => Color::Green,
-                x if x < 80 => Color::Yellow,
+                usage if usage < 80 => Color::Yellow,
+                _ => Color::Red,
+            };
+
+            // normalize frequency to a common 0.=100 scale to avoid very different bar heights
+            let frequency =
+                ((core.frequency as f64 / self.max_frequency as f64) * 100.0).round() as u64;
+            let freq_bar_color = match frequency {
+                temp if temp < 50 => Color::Green,
+                temp if temp < 80 => Color::Yellow,
                 _ => Color::Red,
             };
 
@@ -188,10 +229,11 @@ impl CpuMemoryDetails {
                     Bar::default()
                         .label("%".into())
                         .style(Style::default().fg(usage_bar_color))
-                        .value(core.usage as u64),
+                        .value(core.usage),
                     Bar::default()
                         .label("f".into())
-                        .value(core.frequency as u64),
+                        .style(Style::default().fg(freq_bar_color))
+                        .value(frequency),
                     Bar::default()
                         .label("t".into())
                         // FIXME: two character long label throws the label offset from the bar
@@ -214,25 +256,36 @@ impl CpuMemoryDetails {
     fn render_memory_details(&self, frame: &mut Frame, area: Rect) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(&[Constraint::Percentage(25), Constraint::Fill(1)])
+            .constraints([Constraint::Percentage(25), Constraint::Fill(1)])
             .split(area);
 
-        let memory_total_gb = 16;
-        let memory_used_gb = 4;
-        let memory_free_gb = memory_total_gb - memory_used_gb;
-        let swap_total_gb = 4;
-        let swap_used_gb = 1;
-        let swap_free_gb = swap_total_gb - swap_used_gb;
+        let opts = FormatSizeOptions::default()
+            .base_unit(BaseUnit::Byte)
+            .decimal_places(1)
+            .decimal_zeroes(0)
+            .kilo(humansize::Kilo::Decimal)
+            .long_units(false)
+            .space_after_value(false);
 
         // --- Memory + Swap ---
         let mem_block = Block::default()
             .title("Memory / Swap")
             .borders(Borders::NONE);
         let mem_text = format!(
-            "Total: {:.1} GB\nUsed: {:.1} GB\nFree: {:.1} GB\nSwap: {:.1} GB\nUsed swap: {:.1} GB\nFree swap: {:.1} GB",
-            memory_total_gb, memory_used_gb, memory_free_gb, swap_used_gb, swap_total_gb, swap_free_gb
+            "Total: {}\nUsed: {}\nFree: {}\nSwap: {}\nUsed swap: {}\nFree swap: {}",
+            self.cpu_update.memory_stats.total.format_size(opts),
+            self.cpu_update.memory_stats.used.format_size(opts),
+            self.cpu_update.memory_stats.available.format_size(opts),
+            self.cpu_update.memory_stats.swap_total.format_size(opts),
+            self.cpu_update.memory_stats.swap_used.format_size(opts),
+            self.cpu_update
+                .memory_stats
+                .swap_available
+                .format_size(opts)
         );
-        let mem_para = Paragraph::new(mem_text).block(mem_block);
+        let mem_para = Paragraph::new(mem_text)
+            .block(mem_block)
+            .block(Block::bordered().reset());
 
         // --- Memory Usage Over Time ---
         let mem_dataset = Dataset::default()
@@ -269,7 +322,6 @@ impl CpuMemoryDetails {
                 Block::bordered()
                     .title("Memory & swap usage over time")
                     .title_alignment(Alignment::Center)
-                    .bold()
                     .gray(),
             )
             .x_axis(time_axis)
