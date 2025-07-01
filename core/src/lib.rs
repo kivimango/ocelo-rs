@@ -1,33 +1,78 @@
 pub mod model;
-pub use self::model::{CpuInfo, SystemInfo};
 
-use model::{DiskInfo, MemoryInfo, NetworkInfo, Storage, SystemOverviewInfo};
-use sysinfo::{CpuRefreshKind, DiskRefreshKind, Disks, Networks, RefreshKind, System};
+pub use self::model::{CpuInfo, SystemInfo};
+use model::{
+    CpuCore, CpuMemoryUpdate, DiskInfo, MemoryInfo, NetworkInfo, Storage, SystemOverviewInfo,
+};
+use std::sync::{Arc, Mutex};
+use sysinfo::{
+    Components, CpuRefreshKind, DiskRefreshKind, Disks, MemoryRefreshKind, Networks, RefreshKind,
+    System,
+};
+
+#[derive(Default, Clone, Copy)]
+pub enum SystemInfoPollingContext {
+    #[default]
+    Overview,
+    CpuAndMemory,
+    Processes,
+    Disks,
+    Network,
+}
+
+pub type SharedSystemInfoPoller = Arc<Mutex<SystemInfoPoller>>;
+
+pub enum SystemInfoUpdate {
+    OverView(SystemOverviewInfo),
+    CpuAndMemory(CpuMemoryUpdate),
+    Process,
+    Disk,
+    Network,
+}
+
+impl From<(&SystemInfoPollingContext, &mut SystemInfoPoller)> for SystemInfoUpdate {
+    fn from(value: (&SystemInfoPollingContext, &mut SystemInfoPoller)) -> Self {
+        let (ctx, sysinfo) = value;
+        match ctx {
+            SystemInfoPollingContext::CpuAndMemory => {
+                Self::CpuAndMemory(sysinfo.get_cpu_amd_memory_info())
+            }
+            SystemInfoPollingContext::Disks => Self::Disk,
+            SystemInfoPollingContext::Network => Self::Network,
+            SystemInfoPollingContext::Overview => Self::OverView(sysinfo.get_system_overview()),
+            SystemInfoPollingContext::Processes => Self::Process,
+        }
+    }
+}
 
 pub struct SystemInfoPoller {
+    polling_context: SystemInfoPollingContext,
     inner: System,
     disks: Disks,
     networks: Networks,
 }
 
-impl SystemInfoPoller {
+impl Default for SystemInfoPoller {
     /// Creates a new instance of `SystemInfoPoller`.
     /// After creating, it must be initialized to fetch the first chunk of system information
     /// by calling `self.init()`.
-    pub fn new() -> Self {
+    fn default() -> Self {
         SystemInfoPoller {
+            polling_context: SystemInfoPollingContext::Overview,
             inner: System::new(),
             disks: Disks::new(),
             networks: Networks::new(),
         }
     }
+}
 
-    /// Initalizes the backing system info fetcher
+impl SystemInfoPoller {
+    /// Initalizes the backing system info fetcher by refreshing all ystem information.
     pub fn init(&mut self) {
         self.inner.refresh_all();
     }
 
-    fn get_cpu_info(&mut self) -> CpuInfo {
+    pub fn get_cpu_info(&mut self) -> CpuInfo {
         self.inner.refresh_specifics(
             RefreshKind::nothing()
                 .with_cpu(CpuRefreshKind::nothing().with_cpu_usage().with_frequency()),
@@ -53,6 +98,43 @@ impl SystemInfoPoller {
             core_count,
             temperature: None,
             usage,
+        }
+    }
+
+    fn get_cpu_amd_memory_info(&mut self) -> CpuMemoryUpdate {
+        self.inner.refresh_specifics(
+            RefreshKind::nothing()
+                .with_cpu(CpuRefreshKind::nothing().with_cpu_usage().with_frequency())
+                .with_memory(MemoryRefreshKind::everything()),
+        );
+
+        let sum_freq = self
+            .inner
+            .cpus()
+            .iter()
+            .map(|core| core.frequency())
+            .sum::<u64>() as usize;
+        let avg_freq = sum_freq / self.inner.cpus().len();
+
+        let _ = Components::new_with_refreshed_list()
+            .iter()
+            .map(|f| print!("{}", f.temperature().unwrap()));
+
+        CpuMemoryUpdate {
+            usage: self.inner.global_cpu_usage(),
+            frequency: avg_freq,
+            temperature: 0,
+            cores: self
+                .inner
+                .cpus()
+                .iter()
+                .map(|cpu| CpuCore {
+                    frequency: cpu.frequency(),
+                    temperature: 0,
+                    usage: cpu.cpu_usage() as u64,
+                })
+                .collect(),
+            memory_stats: self.get_memory_info(),
         }
     }
 
@@ -122,5 +204,13 @@ impl SystemInfoPoller {
             disks: self.get_disk_info(),
             network: self.get_network_info(),
         }
+    }
+
+    pub fn polling_context(&self) -> SystemInfoPollingContext {
+        self.polling_context
+    }
+
+    pub fn set_polling_context(&mut self, new_ctx: SystemInfoPollingContext) {
+        self.polling_context = new_ctx;
     }
 }
