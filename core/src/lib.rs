@@ -2,7 +2,8 @@ pub mod model;
 
 pub use self::model::{CpuInfo, SystemInfo};
 use model::{
-    CpuCore, CpuMemoryUpdate, DiskInfo, MemoryInfo, NetworkInfo, Storage, SystemOverviewInfo,
+    CpuCore, CpuMemoryUpdate, DiskInfo, MemoryInfo, NetworkInfo, ProcessInfo, ProcessList, Storage,
+    SystemOverviewInfo,
 };
 use std::sync::{Arc, Mutex};
 use sysinfo::{
@@ -25,7 +26,7 @@ pub type SharedSystemInfoPoller = Arc<Mutex<SystemInfoPoller>>;
 pub enum SystemInfoUpdate {
     OverView(SystemOverviewInfo),
     CpuAndMemory(CpuMemoryUpdate),
-    Process,
+    Process(ProcessList),
     Disk,
     Network,
 }
@@ -40,7 +41,7 @@ impl From<(&SystemInfoPollingContext, &mut SystemInfoPoller)> for SystemInfoUpda
             SystemInfoPollingContext::Disks => Self::Disk,
             SystemInfoPollingContext::Network => Self::Network,
             SystemInfoPollingContext::Overview => Self::OverView(sysinfo.get_system_overview()),
-            SystemInfoPollingContext::Processes => Self::Process,
+            SystemInfoPollingContext::Processes => Self::Process(sysinfo.get_process_list()),
         }
     }
 }
@@ -178,6 +179,15 @@ impl SystemInfoPoller {
     fn get_network_info(&mut self) -> NetworkInfo {
         self.networks.refresh(true);
         NetworkInfo::from(&self.networks)
+    }
+
+    /// Returns the current snapshot of processes.
+    pub fn get_process_list(&self) -> Vec<ProcessInfo> {
+        self.inner
+            .processes()
+            .iter()
+            .map(|(_pid, process)| ProcessInfo::from(process))
+            .collect()
     }
 
     fn get_system_info(&mut self) -> SystemInfo {
