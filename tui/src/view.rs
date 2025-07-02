@@ -1,4 +1,5 @@
-use crate::component::{CpuMemoryDetails, Menu, MenuState, OverView};
+use crate::component::{CpuMemoryDetails, Menu, MenuState, OverView, Processes};
+use core::model::process_list_to_json;
 use core::{SharedSystemInfoPoller, SystemInfoPoller, SystemInfoPollingContext, SystemInfoUpdate};
 use ratatui::layout::{Constraint, Layout};
 use std::sync::mpsc::{self, Receiver};
@@ -16,6 +17,7 @@ pub enum Components {
     CpuDetails,
     Menu,
     Overvieww,
+    Processes,
 }
 
 impl From<&MenuState> for Components {
@@ -23,6 +25,7 @@ impl From<&MenuState> for Components {
         match menu_state {
             MenuState::OverView => Self::Overvieww,
             MenuState::CpuMemoryDetails => Self::CpuDetails,
+            MenuState::ProcessDetails => Self::Processes,
             _ => Self::Overvieww,
         }
     }
@@ -200,8 +203,8 @@ impl View {
                         .tuirealm
                         .attr(
                             &Components::Overvieww,
-                            tuirealm::Attribute::Custom("_SYSTEM_OVERVIEW"),
-                            tuirealm::AttrValue::String(json),
+                            Attribute::Custom("_SYSTEM_OVERVIEW"),
+                            AttrValue::String(json),
                         )
                         .is_ok());
                 }
@@ -209,7 +212,17 @@ impl View {
                     eprint!("Failed to create JSON from SystemOverviewInfo: {}", error)
                 }
             },
-            SystemInfoUpdate::Process => {}
+            SystemInfoUpdate::Process(process_list) => match process_list_to_json(process_list) {
+                Ok(json) => assert!(self
+                    .tuirealm
+                    .attr(
+                        &Components::Processes,
+                        Attribute::Value,
+                        AttrValue::String(json)
+                    )
+                    .is_ok()),
+                Err(error) => eprintln!("Failed to create JSON from ProcessList: {}", error),
+            },
         }
 
         self.redraw = true;
@@ -247,7 +260,24 @@ impl View {
                     .unwrap()
                     .set_polling_context(SystemInfoPollingContext::Overview);
             }
-            MenuState::ProcessDetails => {}
+            MenuState::ProcessDetails => {
+                if !self.tuirealm.mounted(&Components::Processes) {
+                    //let processes = self.system_info.lock().unwrap().get_process_list();
+                    self.tuirealm
+                        .mount(
+                            Components::Processes,
+                            Box::new(Processes::default()),
+                            vec![],
+                        )
+                        .unwrap();
+                }
+                self.system_info
+                    .lock()
+                    .unwrap()
+                    .set_polling_context(SystemInfoPollingContext::Processes);
+                self.tuirealm.blur().unwrap();
+                self.tuirealm.active(&Components::Processes).unwrap();
+            }
         }
 
         self.tuirealm
