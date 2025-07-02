@@ -3,9 +3,12 @@ use ratatui::style::{Style, Stylize};
 mod cpu_details;
 mod menu;
 mod overview;
+mod processes;
+
 pub use self::cpu_details::*;
 pub use self::menu::*;
 pub use self::overview::*;
+pub use self::processes::*;
 
 pub fn get_color_for(percentage: f64) -> Style {
     match percentage {
